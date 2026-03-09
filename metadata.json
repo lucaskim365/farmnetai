@@ -1,0 +1,5 @@
+{
+  "name": "FarmNet AI",
+  "description": "농업의 미래를 함께하는 스마트 비서, FarmNet. AI 기반 작물 진단, 시세 정보 및 영농 지원 플랫폼.",
+  "requestFramePermissions": ["camera", "microphone"]
+}
