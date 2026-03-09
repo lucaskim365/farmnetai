@@ -93,6 +93,14 @@ interface StoreApp {
   color: string;
 }
 
+interface FarmTool {
+  id: string;
+  title: string;
+  desc: string;
+  iconType: string;
+  color: string;
+}
+
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -111,11 +119,14 @@ export default function App() {
   
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<"chat" | "appstore" | "tools">("chat");
+  const [activeView, setActiveView] = useState<"chat" | "appstore" | "tools" | "farmtools">("chat");
   const [apps, setApps] = useState<StoreApp[]>([]);
   const [tools, setTools] = useState<StoreApp[]>([]);
+  const [farmTools, setFarmTools] = useState<FarmTool[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [toolFavorites, setToolFavorites] = useState<string[]>([]);
   const [appSearchQuery, setAppSearchQuery] = useState("");
+  const [toolSearchQuery, setToolSearchQuery] = useState("");
   const [isAppsLoading, setIsAppsLoading] = useState(false);
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [newRoomTitle, setNewRoomTitle] = useState("");
@@ -171,6 +182,31 @@ export default function App() {
       }
     });
 
+    // Farm Tools Store (농업 전문 도구)
+    const unsubscribeFarmTools = onSnapshot(collection(db, "farm_tools_store"), async (snapshot) => {
+      if (snapshot.empty) {
+        const initialFarmTools = [
+          { title: "병해충 진단", desc: "작물 사진으로 병해충 자동 진단", iconType: "Wrench", color: "text-zinc-400" },
+          { title: "날씨 알림", desc: "지역별 맞춤 영농 기상정보", iconType: "Wrench", color: "text-zinc-400" },
+          { title: "시세 분석", desc: "농산물 가격 동향 분석", iconType: "Wrench", color: "text-zinc-400" },
+          { title: "영농 일지", desc: "디지털 농사 기록 관리", iconType: "Wrench", color: "text-zinc-400" },
+          { title: "토양 분석", desc: "토양 성분 및 시비 처방", iconType: "Wrench", color: "text-zinc-400" },
+          { title: "출하 시기 예측", desc: "최적 출하 시기 예측", iconType: "Wrench", color: "text-zinc-400" },
+          { title: "농약 정보", desc: "안전한 농약 사용 정보", iconType: "Wrench", color: "text-zinc-400" },
+          { title: "농기계 대여", desc: "농기계 임대 정보", iconType: "Wrench", color: "text-zinc-400" },
+          { title: "유통 경로", desc: "농산물 유통 및 판로", iconType: "Wrench", color: "text-zinc-400" },
+          { title: "재배 달력", desc: "작물별 재배 일정 관리", iconType: "Wrench", color: "text-zinc-400" },
+          { title: "정부 보조금", desc: "농업 지원 사업 정보", iconType: "Wrench", color: "text-zinc-400" },
+          { title: "스마트팜 관리", desc: "IoT 기반 농장 관리", iconType: "Wrench", color: "text-zinc-400" },
+        ];
+        for (const tool of initialFarmTools) {
+          await addDoc(collection(db, "farm_tools_store"), { ...tool, createdAt: serverTimestamp() });
+        }
+      } else {
+        setFarmTools(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as FarmTool[]);
+      }
+    });
+
     // Marketplace Apps (Wrench cards)
     const unsubscribeApps = onSnapshot(collection(db, "store_apps"), async (snapshot) => {
       if (snapshot.empty) {
@@ -195,6 +231,7 @@ export default function App() {
 
     return () => {
       unsubscribeTools();
+      unsubscribeFarmTools();
       unsubscribeApps();
     };
   }, []);
@@ -205,9 +242,16 @@ export default function App() {
       const unsubscribe = onSnapshot(collection(db, "users", user.uid, "favorites"), (snapshot) => {
         setFavorites(snapshot.docs.map(doc => doc.id));
       });
-      return () => unsubscribe();
+      const unsubscribeTools = onSnapshot(collection(db, "users", user.uid, "tool_favorites"), (snapshot) => {
+        setToolFavorites(snapshot.docs.map(doc => doc.id));
+      });
+      return () => {
+        unsubscribe();
+        unsubscribeTools();
+      };
     } else {
       setFavorites([]);
+      setToolFavorites([]);
     }
   }, [user]);
 
@@ -333,6 +377,20 @@ export default function App() {
     }
     const favRef = doc(db, "users", user.uid, "favorites", appId);
     if (favorites.includes(appId)) {
+      await deleteDoc(favRef);
+    } else {
+      await setDoc(favRef, { createdAt: serverTimestamp() });
+    }
+  };
+
+  const toggleToolFavorite = async (e: React.MouseEvent, toolId: string) => {
+    e.stopPropagation();
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+    const favRef = doc(db, "users", user.uid, "tool_favorites", toolId);
+    if (toolFavorites.includes(toolId)) {
       await deleteDoc(favRef);
     } else {
       await setDoc(favRef, { createdAt: serverTimestamp() });
@@ -578,10 +636,10 @@ export default function App() {
             />
             <SidebarItem 
               icon={<Wrench size={20} />} 
-              label="도구" 
-              active={activeView === "tools"}
+              label="Farm Tools Store" 
+              active={activeView === "farmtools"}
               onClick={() => {
-                setActiveView("tools");
+                setActiveView("farmtools");
                 setIsSidebarOpen(false);
               }} 
             />
@@ -719,9 +777,11 @@ export default function App() {
                   ? chatRooms.find(r => r.id === activeRoomId)?.title 
                   : activeView === "appstore" 
                     ? "Farm App Store" 
-                    : activeView === "tools"
-                      ? "도구"
-                      : "FarmNet AI 상담"}
+                    : activeView === "farmtools"
+                      ? "Farm Tools Store"
+                      : activeView === "tools"
+                        ? "도구"
+                        : "FarmNet AI 상담"}
               </span>
               <ChevronDown size={14} className="text-zinc-500 flex-shrink-0" />
             </div>
@@ -763,7 +823,80 @@ export default function App() {
 
         {/* Chat Area */}
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
-          {activeView === "appstore" || activeView === "tools" ? (
+          {activeView === "farmtools" ? (
+            <div className="max-w-6xl mx-auto py-8">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+                <div className="flex items-center gap-4">
+                  <div className="p-4 bg-[#4ade80]/10 text-[#4ade80] rounded-3xl">
+                    <Wrench size={40} />
+                  </div>
+                  <div>
+                    <h2 className="text-4xl font-bold text-zinc-100 tracking-tight">
+                      Farm Tools Store
+                    </h2>
+                    <p className="text-zinc-500 mt-1">농업인을 위한 스마트 도구 모음</p>
+                  </div>
+                </div>
+                
+                <div className="relative w-full md:w-80">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                  <input 
+                    type="text"
+                    placeholder="필요한 도구를 검색해보세요..."
+                    value={toolSearchQuery}
+                    onChange={(e) => setToolSearchQuery(e.target.value)}
+                    className="w-full bg-[#1e1e1e] border border-zinc-800 rounded-2xl py-3 pl-12 pr-4 text-zinc-200 focus:outline-none focus:border-[#4ade80] transition-all"
+                  />
+                </div>
+              </div>
+
+              {isAppsLoading ? (
+                <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                  <Loader2 className="animate-spin text-[#4ade80]" size={40} />
+                  <p className="text-zinc-500">도구 목록을 불러오는 중...</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {farmTools
+                    .filter(tool => 
+                      tool.title.toLowerCase().includes(toolSearchQuery.toLowerCase()) || 
+                      tool.desc.toLowerCase().includes(toolSearchQuery.toLowerCase())
+                    )
+                    .map((tool) => (
+                      <div 
+                        key={tool.id}
+                        className="bg-[#1e1e1e] border border-zinc-800 p-6 rounded-3xl flex flex-col items-center text-center gap-3 hover:border-zinc-600 transition-all cursor-pointer group relative"
+                      >
+                        <button
+                          onClick={(e) => toggleToolFavorite(e, tool.id)}
+                          className="absolute top-3 right-3 p-2 hover:bg-zinc-800 rounded-full transition-colors z-10"
+                        >
+                          <Star 
+                            size={18} 
+                            className={toolFavorites.includes(tool.id) ? "text-yellow-400 fill-yellow-400" : "text-zinc-600"} 
+                          />
+                        </button>
+                        <div className="w-14 h-14 bg-zinc-900/50 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform border border-zinc-800">
+                          <Wrench size={24} className={tool.color} />
+                        </div>
+                        <div className="text-sm font-bold text-zinc-200">{tool.title}</div>
+                        <div className="text-xs text-zinc-500 line-clamp-2">{tool.desc}</div>
+                      </div>
+                    ))
+                  }
+                  {farmTools.filter(tool => 
+                    tool.title.toLowerCase().includes(toolSearchQuery.toLowerCase()) || 
+                    tool.desc.toLowerCase().includes(toolSearchQuery.toLowerCase())
+                  ).length === 0 && (
+                    <div className="col-span-full py-20 text-center">
+                      <div className="text-zinc-600 mb-2">검색 결과가 없습니다.</div>
+                      <div className="text-zinc-500 text-sm">다른 검색어를 입력해보세요.</div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : activeView === "appstore" || activeView === "tools" ? (
             <div className="max-w-4xl mx-auto py-8">
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
                 <div className="flex items-center gap-4">
@@ -772,7 +905,7 @@ export default function App() {
                   </div>
                   <div>
                     <h2 className="text-4xl font-bold text-zinc-100 tracking-tight">
-                      {activeView === "appstore" ? "Farm App Store" : "도구"}
+                      {activeView === "appstore" ? "Farm App Store" : "Farm Tools Store"}
                     </h2>
                     <p className="text-zinc-500 mt-1">농업인을 위한 스마트 {activeView === "appstore" ? "앱" : "도구"} 모음</p>
                   </div>
@@ -834,52 +967,13 @@ export default function App() {
                 FarmNet
               </div>
               <p className="text-zinc-400 text-lg">농업의 미래를 함께하는 스마트 비서, FarmNet</p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-12 w-full">
-                <ToolItem 
-                  icon={<Search className="text-orange-400" />} 
-                  label="오늘의 농산물 시세" 
-                  desc="전국 도매시장 경매 가격을 실시간으로 확인하세요."
-                  onClick={() => setActiveView("tools")}
-                />
-                <ToolItem 
-                  icon={<ImageIcon className="text-emerald-400" />} 
-                  label="병해충 진단 갤러리" 
-                  desc="AI가 분석한 병해충 사례와 대처법을 확인해보세요."
-                  onClick={() => setActiveView("tools")}
-                />
-                <ToolItem 
-                  icon={<Sparkles className="text-yellow-400" />} 
-                  label="정부 지원 사업" 
-                  desc="농업인을 위한 최신 보조금 및 지원 정책 정보"
-                  onClick={() => setActiveView("tools")}
-                />
-                <ToolItem 
-                  icon={<FileText className="text-blue-400" />} 
-                  label="농업 기술 뉴스" 
-                  desc="스마트팜, 신품종 등 최신 농업 기술 동향"
-                  onClick={() => setActiveView("tools")}
-                />
-                <ToolItem 
-                  icon={<Play className="text-red-400" />} 
-                  label="농사 꿀팁 영상" 
-                  desc="전문가들이 알려주는 작물별 재배 노하우 요약"
-                  onClick={() => setActiveView("tools")}
-                />
-                <ToolItem 
-                  icon={<PenTool className="text-teal-400" />} 
-                  label="귀농/귀촌 가이드" 
-                  desc="성공적인 농촌 정착을 위한 단계별 안내"
-                  onClick={() => setActiveView("tools")}
-                />
-              </div>
 
               {favorites.length > 0 && (
                 <div className="w-full max-w-4xl mt-16 text-left">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-xl font-bold text-zinc-200 flex items-center gap-2">
                       <Star size={20} className="text-yellow-400 fill-yellow-400" />
-                      즐겨찾는 영농 도구
+                      My Farm Apps
                     </h3>
                     <button 
                       onClick={() => setActiveView("appstore")}
@@ -888,19 +982,22 @@ export default function App() {
                       전체보기
                     </button>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                     {apps
                       .filter(app => favorites.includes(app.id))
                       .map(app => (
                         <div 
                           key={app.id}
                           onClick={() => setActiveView("appstore")}
-                          className="bg-[#1e1e1e] border border-zinc-800 p-6 rounded-3xl flex flex-col items-center text-center gap-3 hover:border-zinc-600 transition-all cursor-pointer group"
+                          className="bg-[#1e1e1e] border border-zinc-800/50 p-6 rounded-2xl flex flex-col items-start text-left gap-4 hover:border-zinc-700 transition-all cursor-pointer group"
                         >
-                          <div className="w-14 h-14 bg-zinc-900/50 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform border border-zinc-800">
+                          <div className="w-12 h-12 bg-zinc-900/80 rounded-xl flex items-center justify-center border border-zinc-800 group-hover:scale-110 transition-transform">
                             {getIconComponent(app.iconType, app.color)}
                           </div>
-                          <div className="text-sm font-bold text-zinc-200 truncate w-full">{app.title}</div>
+                          <div className="space-y-1">
+                            <div className="text-base font-bold text-zinc-100 group-hover:text-white transition-colors">{app.title}</div>
+                            <div className="text-xs text-zinc-500 leading-relaxed line-clamp-2">{app.desc}</div>
+                          </div>
                         </div>
                       ))
                     }
@@ -908,14 +1005,43 @@ export default function App() {
                 </div>
               )}
 
-              <div className="w-full max-w-xl mt-12">
-                <div className="grid grid-cols-2 gap-4">
-                  <QuickAction icon={<TrendingUp className="text-orange-400" />} label="농산물 시세" />
-                  <QuickAction icon={<Bug className="text-emerald-400" />} label="병해충 진단" />
-                  <QuickAction icon={<CloudSun className="text-blue-400" />} label="날씨/영농정보" />
-                  <QuickAction icon={<Building2 className="text-yellow-400" />} label="정부 지원사업" />
+              {toolFavorites.length > 0 && (
+                <div className="w-full max-w-4xl mt-12">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-bold text-zinc-200 flex items-center gap-2">
+                      <Wrench size={20} className="text-[#4ade80]" />
+                      Farm Tools Store
+                    </h3>
+                    <button 
+                      onClick={() => setActiveView("farmtools")}
+                      className="text-sm text-[#4ade80] hover:underline"
+                    >
+                      전체보기
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {farmTools
+                      .filter(tool => toolFavorites.includes(tool.id))
+                      .slice(0, 4)
+                      .map(tool => (
+                        <div 
+                          key={tool.id}
+                          onClick={() => setActiveView("farmtools")}
+                          className="bg-[#1e1e1e] border border-zinc-800 p-4 rounded-2xl flex items-center gap-3 hover:border-zinc-600 cursor-pointer transition-all group"
+                        >
+                          <div className="w-10 h-10 bg-zinc-900/80 rounded-xl flex items-center justify-center border border-zinc-800 group-hover:scale-110 transition-transform">
+                            <Wrench size={20} className={tool.color} />
+                          </div>
+                          <div className="flex-1 overflow-hidden">
+                            <div className="text-sm font-bold text-zinc-200 truncate">{tool.title}</div>
+                            <div className="text-xs text-zinc-500 truncate">{tool.desc}</div>
+                          </div>
+                        </div>
+                      ))
+                    }
+                  </div>
                 </div>
-              </div>
+              )}
 
               {user && chatRooms.length > 0 && (
                 <div className="w-full max-w-xl mt-16 text-left">
