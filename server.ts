@@ -33,7 +33,8 @@ async function startServer() {
 
   const upload = multer({ storage });
 
-  app.use(express.json());
+  app.use(express.json({ limit: "20mb" }));
+  app.use(express.urlencoded({ limit: "20mb", extended: true }));
 
   // API Route for file upload
   app.post("/api/upload", upload.single("file"), (req, res) => {
@@ -78,25 +79,46 @@ async function startServer() {
         });
       }
 
-      const chatHistory = (messages || []).map((m: any) => ({
-        role: m.role,
-        parts: [{ text: m.text }],
-      }));
+      const chatHistory = (messages || [])
+        .filter((m: any) => m.text || m.imageUrl || m.fileUrl) // 내용이 있는 메시지만
+        .map((m: any) => {
+          const messageParts: any[] = [];
+          if (m.text) messageParts.push({ text: m.text });
 
+          // 히스토리의 이미지도 포함하고 싶다면 여기에 추가 가능 (현재는 텍스트만 처리 중)
+          // gemini 2.0+ 에서는 이전 이미지도 텍스트와 함께 보낼 수 있습니다.
+
+          return {
+            role: m.role === "model" ? "model" : "user",
+            parts: messageParts.length > 0 ? messageParts : [{ text: " " }], // 빈 파트 방지
+          };
+        });
+
+      console.log(`AI Request: model=${selectedModel}, hasImage=${!!imageData}, historyCount=${chatHistory.length}`);
+
+      // @ts-ignore - SDK 버전에 따라 systemInstruction 위치가 다를 수 있으나 런타임에는 지원됨
       const response = await genAI.models.generateContent({
         model: selectedModel || "gemini-3-flash-preview",
         contents: [...chatHistory, { role: "user", parts }],
-        config: {
-          systemInstruction:
-            "당신은 스마트 농업 비서 'FarmNet'입니다. 농민들에게 작물 재배, 병해충 진단, 농산물 시세, 정부 지원 사업 등에 대해 친절하고 전문적으로 답변해 주세요. 한국어로 답변하세요.",
-          tools: isSearchOn ? [{ googleSearch: {} }] : undefined,
-        },
+        systemInstruction: "당신은 스마트 농업 비서 'FarmNet'입니다. 농민들에게 작물 재배, 병해충 진단, 농산물 시세, 정부 지원 사업 등에 대해 친절하고 전문적으로 답변해 주세요. 한국어로 답변하세요.",
+        tools: isSearchOn ? [{ googleSearch: {} }] : undefined,
       });
 
+      console.log("AI Response received successfully");
       res.json({ text: response.text || "답변을 생성할 수 없습니다." });
     } catch (error: any) {
-      console.error("AI Chat Error:", error);
-      res.status(500).json({ error: error.message || "AI 응답 생성에 실패했습니다." });
+      console.error("AI Chat Error Detail:", error);
+
+      // 상세 에러 정보 추출
+      let errorMsg = error.message || "AI 응답 생성에 실패했습니다.";
+      if (error.response?.data) {
+        errorMsg += " (Server Detail: " + JSON.stringify(error.response.data) + ")";
+      }
+
+      res.status(500).json({
+        error: errorMsg,
+        stack: process.env.NODE_ENV !== "production" ? error.stack : undefined
+      });
     }
   });
 

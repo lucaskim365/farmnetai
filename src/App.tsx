@@ -12,8 +12,7 @@ import {
   doc,
   serverTimestamp
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "./firebase";
+import { db } from "./firebase";
 
 // Components
 import EducationPage from "./EducationPage";
@@ -35,9 +34,10 @@ import { useEducationCourses } from "./hooks/useEducationCourses";
 
 // Services
 import { generateAIResponse, generateRoomTitle } from "./services/aiService";
+import { uploadFileToStorage, isImageFile, validateFile } from "./services/storageService";
 
 // Types
-import { ViewType } from "./types";
+import { ViewType, FileAttachment } from "./types";
 
 export default function App() {
   const { user, isAuthLoading, handleEmailAuth, handleGoogleLogin } = useAuth();
@@ -67,8 +67,7 @@ export default function App() {
   const [selectedModel, setSelectedModel] = useState("gemini-3-flash-preview");
   const [isSearchOn, setIsSearchOn] = useState(false);
 
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [attachment, setAttachment] = useState<FileAttachment | null>(null);
 
   const [appSearchQuery, setAppSearchQuery] = useState("");
   const [toolsSearchQuery, setToolsSearchQuery] = useState("");
@@ -89,19 +88,66 @@ export default function App() {
     }
   }, [user, setActiveRoomId]);
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onload = (e) => setImagePreview(e.target?.result as string);
-      reader.readAsDataURL(file);
+
+      const error = validateFile(file);
+      if (error) {
+        alert(error);
+        return;
+      }
+
+      const isImage = isImageFile(file);
+      if (isImage) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setAttachment({
+            file,
+            preview: e.target?.result as string,
+            isImage: true,
+          });
+        };
+        reader.readAsDataURL(file);
+      } else {
+        setAttachment({
+          file,
+          preview: null,
+          isImage: false,
+        });
+      }
     }
   };
 
-  const handleImageRemove = () => {
-    setSelectedImage(null);
-    setImagePreview(null);
+  const handleFileDrop = (file: File) => {
+    const error = validateFile(file);
+    if (error) {
+      alert(error);
+      return;
+    }
+
+    const isImage = isImageFile(file);
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setAttachment({
+          file,
+          preview: e.target?.result as string,
+          isImage: true,
+        });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setAttachment({
+        file,
+        preview: null,
+        isImage: false,
+      });
+    }
+  };
+
+  const handleFileRemove = () => {
+    setAttachment(null);
   };
 
   const handleToggleFavorite = async (e: React.MouseEvent, appId: string) => {
@@ -123,7 +169,7 @@ export default function App() {
   };
 
   const handleSendMessage = async () => {
-    if ((!input.trim() && !selectedImage) || isLoading) return;
+    if ((!input.trim() && !attachment) || isLoading) return;
 
     if (!user) {
       setShowAuthModal(true);
@@ -143,30 +189,38 @@ export default function App() {
 
     setIsLoading(true);
     const currentInput = input;
-    const currentImage = selectedImage;
+    const currentAttachment = attachment;
     setInput("");
-    setSelectedImage(null);
-    setImagePreview(null);
+    setAttachment(null);
 
     try {
-      let imageUrl = "";
-      if (currentImage) {
-        const storageRef = ref(storage, `users/${user.uid}/rooms/${roomId}/${Date.now()}_${currentImage.name}`);
-        await uploadBytes(storageRef, currentImage);
-        imageUrl = await getDownloadURL(storageRef);
+      let fileData: { url: string; name: string; size: number; type: string } | null = null;
+      if (currentAttachment) {
+        fileData = await uploadFileToStorage(user.uid, roomId, currentAttachment.file);
       }
 
-      await addDoc(collection(db, "users", user.uid, "rooms", roomId, "messages"), {
+      const messageData: Record<string, any> = {
         role: "user",
         text: currentInput,
-        imageUrl: imageUrl,
-        timestamp: serverTimestamp()
-      });
+        timestamp: serverTimestamp(),
+      };
+
+      if (fileData) {
+        if (fileData.type.startsWith("image/")) {
+          messageData.imageUrl = fileData.url;
+        }
+        messageData.fileUrl = fileData.url;
+        messageData.fileName = fileData.name;
+        messageData.fileSize = fileData.size;
+        messageData.fileType = fileData.type;
+      }
+
+      await addDoc(collection(db, "users", user.uid, "rooms", roomId, "messages"), messageData);
 
       const modelText = await generateAIResponse(
         messages,
         currentInput,
-        currentImage,
+        currentAttachment?.isImage ? currentAttachment.file : null,
         selectedModel,
         isSearchOn
       );
@@ -184,11 +238,12 @@ export default function App() {
         timestamp: serverTimestamp()
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("AI Error:", error);
+      const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
       await addDoc(collection(db, "users", user.uid, "rooms", roomId, "messages"), {
         role: "model",
-        text: "오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        text: `${errorMessage} 잠시 후 다시 시도해 주세요.`,
         timestamp: serverTimestamp()
       });
     } finally {
@@ -296,10 +351,10 @@ export default function App() {
           setSelectedModel={setSelectedModel}
           isSearchOn={isSearchOn}
           setIsSearchOn={setIsSearchOn}
-          selectedImage={selectedImage}
-          imagePreview={imagePreview}
-          onImageSelect={handleImageSelect}
-          onImageRemove={handleImageRemove}
+          attachment={attachment}
+          onFileSelect={handleFileSelect}
+          onFileDrop={handleFileDrop}
+          onFileRemove={handleFileRemove}
           onSend={handleSendMessage}
           isLoading={isLoading}
         />

@@ -1,6 +1,8 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ImageIcon, Mic, Send, Globe, X } from "lucide-react";
+import { Paperclip, Mic, Send, Globe, X, FileText, Upload } from "lucide-react";
+import { FileAttachment } from "../types";
+import { formatFileSize } from "../services/storageService";
 
 interface ChatInputProps {
   input: string;
@@ -9,10 +11,10 @@ interface ChatInputProps {
   setSelectedModel: (model: string) => void;
   isSearchOn: boolean;
   setIsSearchOn: (value: boolean) => void;
-  selectedImage: File | null;
-  imagePreview: string | null;
-  onImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onImageRemove: () => void;
+  attachment: FileAttachment | null;
+  onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onFileDrop: (file: File) => void;
+  onFileRemove: () => void;
   onSend: () => void;
   isLoading: boolean;
 }
@@ -24,20 +26,89 @@ export function ChatInput({
   setSelectedModel,
   isSearchOn,
   setIsSearchOn,
-  selectedImage,
-  imagePreview,
-  onImageSelect,
-  onImageRemove,
+  attachment,
+  onFileSelect,
+  onFileDrop,
+  onFileRemove,
   onSend,
   isLoading
 }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounter = useRef(0);
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current++;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounter.current = 0;
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      onFileDrop(e.dataTransfer.files[0]);
+      e.dataTransfer.clearData();
+    }
+  };
 
   return (
-    <div className="absolute bottom-8 left-0 right-0 px-6">
-      <div className="max-w-3xl mx-auto bg-[#1a1a1a] border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden focus-within:border-zinc-600 transition-all">
+    <div
+      className="absolute bottom-8 left-0 right-0 px-6"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      <div className={`max-w-3xl mx-auto bg-[#1a1a1a] border rounded-3xl shadow-2xl overflow-hidden transition-all ${isDragging
+          ? "border-[#4ade80] border-2 shadow-[#4ade80]/20"
+          : "border-zinc-800 focus-within:border-zinc-600"
+        }`}>
+        {/* 드래그 오버레이 */}
         <AnimatePresence>
-          {imagePreview && (
+          {isDragging && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-10 flex items-center justify-center bg-[#0a0a0a]/80 backdrop-blur-sm rounded-3xl"
+            >
+              <div className="flex flex-col items-center gap-3 text-[#4ade80]">
+                <motion.div
+                  animate={{ y: [0, -8, 0] }}
+                  transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                >
+                  <Upload size={40} />
+                </motion.div>
+                <p className="text-sm font-bold">파일을 여기에 놓으세요</p>
+                <p className="text-xs text-zinc-500">이미지, PDF, 문서 등 (최대 10MB)</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {attachment && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
@@ -45,17 +116,26 @@ export function ChatInput({
               className="px-6 pt-4 flex items-center gap-4"
             >
               <div className="relative">
-                <img src={imagePreview} className="w-20 h-20 object-cover rounded-xl border border-zinc-700" />
+                {attachment.isImage && attachment.preview ? (
+                  <img src={attachment.preview} className="w-20 h-20 object-cover rounded-xl border border-zinc-700" />
+                ) : (
+                  <div className="w-20 h-20 rounded-xl border border-zinc-700 bg-zinc-800 flex items-center justify-center">
+                    <FileText size={28} className="text-zinc-400" />
+                  </div>
+                )}
                 <button
-                  onClick={onImageRemove}
-                  className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1 shadow-lg"
+                  onClick={onFileRemove}
+                  className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1 shadow-lg hover:bg-rose-400 transition-colors"
                 >
                   <X size={12} />
                 </button>
               </div>
               <div className="text-xs text-zinc-500">
-                <p className="font-bold text-zinc-300">{selectedImage?.name}</p>
-                <p>{(selectedImage?.size || 0) / 1024 > 1024 ? `${((selectedImage?.size || 0) / (1024 * 1024)).toFixed(2)} MB` : `${((selectedImage?.size || 0) / 1024).toFixed(2)} KB`}</p>
+                <p className="font-bold text-zinc-300 truncate max-w-[200px]">{attachment.file.name}</p>
+                <p>{formatFileSize(attachment.file.size)}</p>
+                {!attachment.isImage && (
+                  <p className="text-zinc-600 mt-0.5">{attachment.file.type || "알 수 없는 형식"}</p>
+                )}
               </div>
             </motion.div>
           )}
@@ -91,15 +171,16 @@ export function ChatInput({
             <input
               type="file"
               ref={fileInputRef}
-              onChange={onImageSelect}
+              onChange={onFileSelect}
               className="hidden"
-              accept="image/*"
+              accept="image/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.hwp"
             />
             <button
               onClick={() => fileInputRef.current?.click()}
               className="p-2 hover:bg-zinc-800 rounded-full text-zinc-500 hover:text-zinc-300 transition-colors"
+              title="파일 첨부 (이미지, PDF, 문서 등)"
             >
-              <ImageIcon size={20} />
+              <Paperclip size={20} />
             </button>
             <button className="p-2 hover:bg-zinc-800 rounded-full text-zinc-500 hover:text-zinc-300 transition-colors opacity-50 cursor-not-allowed" disabled title="준비 중인 기능입니다">
               <Mic size={20} />
@@ -122,8 +203,8 @@ export function ChatInput({
 
           <button
             onClick={onSend}
-            disabled={(!input.trim() && !selectedImage) || isLoading}
-            className={`p-3 rounded-2xl transition-all ${(input.trim() || selectedImage) && !isLoading ? "bg-[#4ade80] text-black shadow-lg shadow-[#4ade80]/20" : "bg-zinc-800 text-zinc-600 cursor-not-allowed"}`}
+            disabled={(!input.trim() && !attachment) || isLoading}
+            className={`p-3 rounded-2xl transition-all ${(input.trim() || attachment) && !isLoading ? "bg-[#4ade80] text-black shadow-lg shadow-[#4ade80]/20" : "bg-zinc-800 text-zinc-600 cursor-not-allowed"}`}
           >
             <Send size={20} />
           </button>

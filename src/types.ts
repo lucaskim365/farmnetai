@@ -6,6 +6,16 @@ export interface ChatMessage {
   text: string;
   timestamp?: Timestamp | null;
   imageUrl?: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  fileType?: string;
+}
+
+export interface FileAttachment {
+  file: File;
+  preview: string | null;
+  isImage: boolean;
 }
 
 export interface ChatRoom {

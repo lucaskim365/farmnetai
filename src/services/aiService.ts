@@ -37,6 +37,7 @@ export const generateAIResponse = async (
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+    console.error("AI Service Error:", errorData);
     throw new Error(errorData.error || "AI 응답 생성에 실패했습니다.");
   }
 
