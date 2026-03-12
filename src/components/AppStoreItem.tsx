@@ -7,17 +7,19 @@ interface AppStoreItemProps {
   desc?: string;
   isFavorite?: boolean;
   onToggleFavorite?: (e: React.MouseEvent) => void;
+  onClick?: () => void;
 }
 
-export function AppStoreItem({ 
-  icon, 
-  title, 
-  desc, 
-  isFavorite, 
-  onToggleFavorite 
+export function AppStoreItem({
+  icon,
+  title,
+  desc,
+  isFavorite,
+  onToggleFavorite,
+  onClick,
 }: AppStoreItemProps) {
   return (
-    <div className="bg-[#1e1e1e] border border-zinc-800/50 p-6 rounded-2xl hover:border-zinc-700 transition-all cursor-pointer group relative flex flex-col items-start text-left gap-4">
+    <div className="bg-[#1e1e1e] border border-zinc-800/50 p-6 rounded-2xl hover:border-zinc-700 transition-all cursor-pointer group relative flex flex-col items-start text-left gap-4" onClick={onClick}>
       <button 
         onClick={onToggleFavorite}
         className="absolute top-4 right-4 p-2 rounded-full bg-zinc-900/50 hover:bg-zinc-800 transition-colors z-10"

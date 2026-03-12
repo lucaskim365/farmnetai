@@ -17,7 +17,8 @@ import {
   ClipboardList,
   Calculator,
   FlaskConical,
-  Building2
+  Building2,
+  UserCheck
 } from "lucide-react";
 
 export function getIconComponent(type: string, colorClass: string, size?: number) {
@@ -41,6 +42,7 @@ export function getIconComponent(type: string, colorClass: string, size?: number
     case "Calculator": return <Calculator {...iconProps} />;
     case "FlaskConical": return <FlaskConical {...iconProps} />;
     case "Building2": return <Building2 {...iconProps} />;
+    case "UserCheck": return <UserCheck {...iconProps} />;
     default: return <LayoutGrid {...iconProps} />;
   }
 }

@@ -2,8 +2,15 @@ import { StoreApp } from "../types";
 
 // Farm App Store 데이터
 export const INITIAL_FARM_APPS_STORE: Omit<StoreApp, "id">[] = [
-  { 
-    title: "토양 분석", 
+  {
+    title: "인력 인터뷰",
+    desc: "AI Sowi가 진행하는 농업 현장 인력 역량 평가",
+    iconType: "UserCheck",
+    color: "text-yellow-400",
+    appType: "interview",
+  },
+  {
+    title: "토양 분석",
     desc: "토양 성분 분석 및 시비 처방", 
     iconType: "FlaskConical", 
     color: "text-pink-400" 

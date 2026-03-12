@@ -23,6 +23,8 @@ import { AuthModal } from "./components/AuthModal";
 import { StoreView } from "./components/StoreView";
 import { HomeDashboard } from "./components/HomeDashboard";
 import { ChatView } from "./components/ChatView";
+import { InterviewView } from "./components/InterviewView";
+import MyFarmDashboard from "./components/myfarm/MyFarmDashboard";
 
 // Hooks
 import { useAuth } from "./hooks/useAuth";
@@ -37,7 +39,11 @@ import { generateAIResponse, generateRoomTitle } from "./services/aiService";
 import { uploadFileToStorage, isImageFile, validateFile } from "./services/storageService";
 
 // Types
-import { ViewType, FileAttachment } from "./types";
+import { ViewType, FileAttachment, StoreApp, InterviewSessionDoc } from "./types";
+
+// Hooks
+import { useInterview } from "./hooks/useInterview";
+import { useInterviewSessions } from "./hooks/useInterviewSessions";
 
 export default function App() {
   const { user, isAuthLoading, handleEmailAuth, handleGoogleLogin } = useAuth();
@@ -57,6 +63,26 @@ export default function App() {
   const { favorites, toggleFavorite } = useFavorites(user);
   const { farmAppsStore, farmToolsStore, isAppsLoading, isToolsLoading } = useStoreData();
   const { courses } = useEducationCourses();
+  const {
+    sessions: interviewSessions,
+    createSession,
+    updateSessionTitle,
+    updateSessionStep,
+    completeSession,
+    saveMessages,
+    renameSession,
+    deleteSession,
+    loadSessionMessages,
+  } = useInterviewSessions(user);
+
+  const { session: interviewSession, isLoading: interviewLoading, saveStatus, startInterview, sendMessage: sendInterviewMessage, resetInterview, resumeSession } = useInterview(
+    user,
+    createSession,
+    updateSessionStep,
+    updateSessionTitle,
+    completeSession,
+    saveMessages
+  );
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -148,6 +174,13 @@ export default function App() {
 
   const handleFileRemove = () => {
     setAttachment(null);
+  };
+
+  const handleAppClick = (app: StoreApp) => {
+    if (app.appType === "interview") {
+      resetInterview();
+      setActiveView("interview");
+    }
   };
 
   const handleToggleFavorite = async (e: React.MouseEvent, appId: string) => {
@@ -297,11 +330,39 @@ export default function App() {
           user={user}
           isAuthLoading={isAuthLoading}
           onShowAuth={() => setShowAuthModal(true)}
-          onRoomSelect={(roomId) => setActiveRoomId(roomId)}
+          onRoomSelect={(roomId) => {
+            setActiveRoomId(roomId);
+            setActiveView("chat");
+          }}
         />
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-8">
-          {activeView === "education" ? (
+        <div className={`flex-1 ${(activeView === "interview" || activeView === "myfarm") ? "overflow-hidden" : "overflow-y-auto p-6 space-y-8"}`}>
+          {activeView === "interview" ? (
+            <InterviewView
+              session={interviewSession}
+              isLoading={interviewLoading}
+              saveStatus={saveStatus}
+              onSendMessage={sendInterviewMessage}
+              onReset={() => {
+                resetInterview();
+                setActiveView("appstore");
+              }}
+              sessions={interviewSessions}
+              onNewInterview={() => startInterview("sowi")}
+              onResumeSession={async (s: InterviewSessionDoc) => {
+                const msgs = await loadSessionMessages(s.id);
+                resumeSession(s, msgs);
+              }}
+              onRenameSession={renameSession}
+              onDeleteSession={deleteSession}
+              isLoggedIn={!!user}
+            />
+          ) : activeView === "myfarm" ? (
+            <MyFarmDashboard 
+              onMenuClick={() => setIsSidebarOpen(true)} 
+              user={user} 
+            />
+          ) : activeView === "education" ? (
             <EducationPage />
           ) : activeView === "appstore" ? (
             <StoreView
@@ -312,6 +373,7 @@ export default function App() {
               isLoading={isAppsLoading}
               favorites={favorites}
               onToggleFavorite={handleToggleFavorite}
+              onAppClick={handleAppClick}
             />
           ) : activeView === "tools" ? (
             <StoreView
@@ -332,7 +394,10 @@ export default function App() {
               chatRooms={chatRooms}
               user={user}
               onViewChange={setActiveView}
-              onRoomSelect={setActiveRoomId}
+              onRoomSelect={(roomId) => {
+                setActiveRoomId(roomId);
+                setActiveView("chat");
+              }}
               onSidebarOpen={() => setIsSidebarOpen(true)}
             />
           ) : (
@@ -344,20 +409,22 @@ export default function App() {
           )}
         </div>
 
-        <ChatInput
-          input={input}
-          setInput={setInput}
-          selectedModel={selectedModel}
-          setSelectedModel={setSelectedModel}
-          isSearchOn={isSearchOn}
-          setIsSearchOn={setIsSearchOn}
-          attachment={attachment}
-          onFileSelect={handleFileSelect}
-          onFileDrop={handleFileDrop}
-          onFileRemove={handleFileRemove}
-          onSend={handleSendMessage}
-          isLoading={isLoading}
-        />
+        {activeView !== "interview" && activeView !== "myfarm" && (
+          <ChatInput
+            input={input}
+            setInput={setInput}
+            selectedModel={selectedModel}
+            setSelectedModel={setSelectedModel}
+            isSearchOn={isSearchOn}
+            setIsSearchOn={setIsSearchOn}
+            attachment={attachment}
+            onFileSelect={handleFileSelect}
+            onFileDrop={handleFileDrop}
+            onFileRemove={handleFileRemove}
+            onSend={handleSendMessage}
+            isLoading={isLoading}
+          />
+        )}
       </main>
 
       <AnimatePresence>

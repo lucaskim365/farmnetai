@@ -7,7 +7,7 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   activeView: string;
-  onViewChange: (view: "chat" | "appstore" | "tools" | "education") => void;
+  onViewChange: (view: "chat" | "appstore" | "tools" | "education" | "myfarm") => void;
   onNewRoom: () => void;
   chatRooms: ChatRoom[];
   activeRoomId: string | null;
@@ -126,7 +126,15 @@ export default function Sidebar({
               onClose();
             }}
           />
-          <SidebarItem icon={<Bookmark size={20} />} label="My Farm" onClick={onClose} />
+          <SidebarItem 
+            icon={<Bookmark size={20} />} 
+            label="마이팜" 
+            active={activeView === "myfarm"}
+            onClick={() => {
+              onViewChange("myfarm");
+              onClose();
+            }} 
+          />
         </nav>
       </div>
 

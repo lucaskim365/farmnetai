@@ -48,6 +48,7 @@ export function Header({
       case "appstore": return "Farm App Store";
       case "tools": return "Farm Tools Store";
       case "education": return "농업 교육";
+      case "myfarm": return "마이팜 대시보드";
       default: return "FarmNet AI 상담";
     }
   };

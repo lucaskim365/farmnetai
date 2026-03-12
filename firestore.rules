@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── 시스템 메타데이터 (읽기/쓰기 제한) ───────────────────────
+    match /_system/{doc} {
+      allow read: if true;
+      allow write: if true; // 시딩용 (운영 시 관리자만으로 변경 권장)
+    }
+
+    // ─── Farm App / Tools Store (공개 읽기, 쓰기는 시딩용) ────────
+    match /farm_apps_store/{doc} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /farm_tools_store/{doc} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ─── 교육 과정 (공개 읽기) ──────────────────────────────────
+    match /education_courses/{doc} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ─── 사용자 채팅방 & 메시지 (로그인 필수) ──────────────────────
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ─── Sowi 인터뷰 평가 결과 ──────────────────────────────────
+    // 누구나 생성 가능 (비로그인 사용자 포함)
+    // 본인 데이터만 읽기/삭제 가능 (로그인 시 uid 비교, 비로그인은 본인 확인 불가)
+    match /interview_evaluations/{docId} {
+      allow create: if true;
+      allow read:   if request.auth != null && resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
+  }
+}

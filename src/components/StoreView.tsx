@@ -12,6 +12,7 @@ interface StoreViewProps {
   isLoading: boolean;
   favorites: string[];
   onToggleFavorite: (e: React.MouseEvent, appId: string) => void;
+  onAppClick?: (app: StoreApp) => void;
 }
 
 export function StoreView({
@@ -21,7 +22,8 @@ export function StoreView({
   setSearchQuery,
   isLoading,
   favorites,
-  onToggleFavorite
+  onToggleFavorite,
+  onAppClick,
 }: StoreViewProps) {
   const title = viewType === "appstore" ? "Farm App Store" : "Farm Tools Store";
   const subtitle = `농업인을 위한 스마트 ${viewType === "appstore" ? "앱" : "도구"} 모음`;
@@ -78,6 +80,7 @@ export function StoreView({
                     desc={app.desc}
                     isFavorite={favorites.includes(app.id)}
                     onToggleFavorite={(e) => onToggleFavorite(e, app.id)}
+                    onClick={() => onAppClick?.(app)}
                   />
                 </React.Fragment>
               ))

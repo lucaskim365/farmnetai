@@ -36,14 +36,18 @@ const clearCollection = async (collectionName: string) => {
  * 데이터베이스에 초기 데이터를 한 번만 시딩하는 함수
  * 배치 쓰기를 사용하여 성능 최적화
  */
+const SEED_VERSION = "3.0.0";
+
 export const seedDatabaseOnce = async () => {
   try {
-    // 이미 시딩되었는지 확인
+    // 버전이 같으면 스킵, 다르면 재시딩
     const seedStatus = await checkSeedStatus();
-    if (seedStatus?.completed) {
-      console.log("Database already seeded, skipping...");
+    if (seedStatus?.completed && seedStatus?.version === SEED_VERSION) {
+      console.log("Database already seeded (latest version), skipping...");
       return { success: true, alreadySeeded: true };
     }
+
+    console.log(`Seeding database (version ${SEED_VERSION})...`);
 
     console.log("Starting database seeding...");
     
@@ -94,7 +98,7 @@ export const seedDatabaseOnce = async () => {
     await setDoc(doc(db, "_system", "seed_status"), {
       completed: true,
       timestamp: new Date(),
-      version: "2.0.0"
+      version: SEED_VERSION
     });
 
     console.log("Database seeding completed successfully!");
