@@ -56,36 +56,54 @@ export function StoreView({
 
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-20 space-y-4">
-          <Loader2 className="animate-spin text-[#4ade80]" size={40} />
-          <p className="text-zinc-500">{viewType === "appstore" ? "앱" : "도구"} 목록을 불러오는 중...</p>
+          <div className="relative">
+            <Loader2 className="animate-spin text-[#4ade80]" size={40} />
+            <div className="absolute inset-0 blur-lg bg-[#4ade80]/20 animate-pulse rounded-full" />
+          </div>
+          <p className="text-zinc-500 animate-pulse">{viewType === "appstore" ? "앱" : "도구"} 목록을 불러오는 중...</p>
         </div>
       ) : (
         <>
-          {viewType === "tools" && (
+          {viewType === "tools" && apps.length > 0 && (
             <div className="mb-8">
               <h3 className="text-2xl font-bold text-zinc-200 mb-6">농업 전문 도구</h3>
             </div>
           )}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {apps
-              .filter(app =>
-                app.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                app.desc.toLowerCase().includes(searchQuery.toLowerCase())
-              )
-              .map((app) => (
-                <React.Fragment key={app.id}>
-                  <AppStoreItem
-                    icon={getIconComponent(app.iconType, app.color)}
-                    title={app.title}
-                    desc={app.desc}
-                    isFavorite={favorites.includes(app.id)}
-                    onToggleFavorite={(e) => onToggleFavorite(e, app.id)}
-                    onClick={() => onAppClick?.(app)}
-                  />
-                </React.Fragment>
-              ))
-            }
-          </div>
+          
+          {apps.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {apps
+                .filter(app =>
+                  app.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  app.desc.toLowerCase().includes(searchQuery.toLowerCase())
+                )
+                .map((app) => (
+                  <React.Fragment key={app.id}>
+                    <AppStoreItem
+                      icon={getIconComponent(app.iconType, app.color)}
+                      title={app.title}
+                      desc={app.desc}
+                      isFavorite={favorites.includes(app.id)}
+                      onToggleFavorite={(e) => onToggleFavorite(e, app.id)}
+                      onClick={() => onAppClick?.(app)}
+                    />
+                  </React.Fragment>
+                ))
+              }
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-20 border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/30">
+              <Globe className="text-zinc-700 mb-4" size={48} />
+              <p className="text-zinc-400 text-lg font-medium">표시할 {viewType === "appstore" ? "앱이" : "도구가"} 없습니다.</p>
+              <p className="text-zinc-600 text-sm mt-2">데이터베이스 연결 상태를 확인하거나 잠시 후 다시 시도해 주세요.</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="mt-6 px-6 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition-colors text-sm"
+              >
+                페이지 새로고침
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

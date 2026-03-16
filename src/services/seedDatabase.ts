@@ -48,15 +48,17 @@ export const seedDatabaseOnce = async () => {
     }
 
     console.log(`Seeding database (version ${SEED_VERSION})...`);
-
-    console.log("Starting database seeding...");
+    console.log("Starting database seeding process...");
     
     // 기존 데이터 삭제
+    console.log("Clearing old collections...");
     await clearCollection("farm_apps_store");
     await clearCollection("farm_tools_store");
     await clearCollection("education_courses");
+    console.log("Old collections cleared.");
     
     const batch = writeBatch(db);
+    console.log(`Adding ${INITIAL_FARM_APPS_STORE.length} apps to batch...`);
 
     // Farm App Store 시딩
     INITIAL_FARM_APPS_STORE.forEach((app, index) => {
