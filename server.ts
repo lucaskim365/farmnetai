@@ -97,7 +97,7 @@ async function startServer() {
       console.log(`AI Request: model=${selectedModel}, hasImage=${!!imageData}, historyCount=${chatHistory.length}`);
 
       const response = await genAI.models.generateContent({
-        model: selectedModel || "gemini-2.0-flash",
+        model: selectedModel || "gemini-flash-latest",
         contents: [...chatHistory, { role: "user", parts }],
         config: {
           systemInstruction: "당신은 스마트 농업 비서 'FarmNet'입니다. 농민들에게 작물 재배, 병해충 진단, 농산물 시세, 정부 지원 사업 등에 대해 친절하고 전문적으로 답변해 주세요. 한국어로 답변하세요.",
@@ -210,7 +210,7 @@ totalScore = (taskUnderstanding*0.20 + practicalExperience*0.25 + safetyAwarenes
       }));
 
       const response = await genAI.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-flash-latest",
         contents: [
           ...geminiHistory,
           { role: "user", parts: [{ text: userMessage }] },
@@ -234,7 +234,7 @@ totalScore = (taskUnderstanding*0.20 + practicalExperience*0.25 + safetyAwarenes
     try {
       const { input } = req.body;
       const titleResponse = await genAI.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-flash-latest",
         contents: `다음 질문에 대해 10자 이내의 아주 짧고 명확한 상담 제목을 하나만 생성해 주세요. 다른 설명 없이 제목만 출력하세요: "${input}"`,
       });
       const title = titleResponse.text?.trim().replace(/["']/g, "") || input.slice(0, 20);

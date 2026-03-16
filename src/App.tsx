@@ -91,7 +91,7 @@ export default function App() {
 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("gemini-2.0-flash");
+  const [selectedModel, setSelectedModel] = useState("gemini-flash-latest");
   const [isSearchOn, setIsSearchOn] = useState(false);
 
   const [attachment, setAttachment] = useState<FileAttachment | null>(null);
@@ -357,6 +357,7 @@ export default function App() {
               onRenameSession={renameSession}
               onDeleteSession={deleteSession}
               isLoggedIn={!!user}
+              onBackToList={() => setActiveView("appstore")}
             />
           ) : activeView === "myfarm" ? (
             <MyFarmDashboard 
