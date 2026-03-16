@@ -7,8 +7,6 @@ import { formatFileSize } from "../services/storageService";
 interface ChatInputProps {
   input: string;
   setInput: (value: string) => void;
-  selectedModel: string;
-  setSelectedModel: (model: string) => void;
   isSearchOn: boolean;
   setIsSearchOn: (value: boolean) => void;
   attachment: FileAttachment | null;
@@ -22,8 +20,6 @@ interface ChatInputProps {
 export function ChatInput({
   input,
   setInput,
-  selectedModel,
-  setSelectedModel,
   isSearchOn,
   setIsSearchOn,
   attachment,
@@ -141,30 +137,15 @@ export function ChatInput({
           )}
         </AnimatePresence>
 
-        <div className="flex items-center gap-4 px-6 pt-4 pb-2 border-b border-zinc-800/50">
-          <div className="flex bg-[#121212] p-1 rounded-xl gap-1">
-            <button
-              onClick={() => setSelectedModel("gemini-3-flash-preview")}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${selectedModel === "gemini-3-flash-preview" ? "bg-[#4ade80] text-black" : "text-zinc-500 hover:text-zinc-300"}`}
-            >
-              Flash 3
-            </button>
-            <button
-              onClick={() => setSelectedModel("gemini-3.1-pro-preview")}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${selectedModel === "gemini-3.1-pro-preview" ? "bg-[#4ade80] text-black" : "text-zinc-500 hover:text-zinc-300"}`}
-            >
-              Pro 3.1
-            </button>
-          </div>
-          <div className="h-4 w-px bg-zinc-800" />
-          <button
-            onClick={() => setIsSearchOn(!isSearchOn)}
-            className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-bold transition-all ${isSearchOn ? "text-[#4ade80]" : "text-zinc-500"}`}
-          >
-            <Globe size={14} />
-            실시간 검색 {isSearchOn ? "ON" : "OFF"}
-          </button>
-        </div>
+    <div className="flex items-center gap-4 px-6 pt-4 pb-2 border-b border-zinc-800/50">
+           <button
+             onClick={() => setIsSearchOn(!isSearchOn)}
+             className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-bold transition-all ${isSearchOn ? "text-[#4ade80]" : "text-zinc-500"}`}
+           >
+             <Globe size={14} />
+             실시간 검색 {isSearchOn ? "ON" : "OFF"}
+           </button>
+         </div>
 
         <div className="p-4 flex items-end gap-3">
           <div className="flex gap-2 mb-2">

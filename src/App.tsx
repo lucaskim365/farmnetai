@@ -416,8 +416,6 @@ export default function App() {
           <ChatInput
             input={input}
             setInput={setInput}
-            selectedModel={selectedModel}
-            setSelectedModel={setSelectedModel}
             isSearchOn={isSearchOn}
             setIsSearchOn={setIsSearchOn}
             attachment={attachment}
