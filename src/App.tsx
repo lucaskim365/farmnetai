@@ -49,6 +49,7 @@ export default function App() {
   const { user, isAuthLoading, handleEmailAuth, handleGoogleLogin } = useAuth();
   const {
     chatRooms,
+    isChatRoomsLoading,
     activeRoomId,
     setActiveRoomId,
     editingRoomId,
@@ -90,7 +91,7 @@ export default function App() {
 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("gemini-3-flash-preview");
+  const [selectedModel, setSelectedModel] = useState("gemini-2.0-flash");
   const [isSearchOn, setIsSearchOn] = useState(false);
 
   const [attachment, setAttachment] = useState<FileAttachment | null>(null);
@@ -317,7 +318,7 @@ export default function App() {
         setNewRoomTitle={setNewRoomTitle}
         onRoomRename={renameRoom}
         user={user}
-        isAuthLoading={isAuthLoading}
+        isAuthLoading={isAuthLoading || isChatRoomsLoading}
         onShowAuth={() => setShowAuthModal(true)}
       />
 
@@ -392,6 +393,7 @@ export default function App() {
               courses={courses}
               favorites={favorites}
               chatRooms={chatRooms}
+              isChatRoomsLoading={isChatRoomsLoading}
               user={user}
               onViewChange={setActiveView}
               onRoomSelect={(roomId) => {
