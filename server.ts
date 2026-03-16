@@ -12,7 +12,6 @@ if (fs.existsSync(".env.local")) {
   dotenv.config();
 }
 
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 const app = express();
 const uploadDir = path.join(process.cwd(), "uploads");
 
@@ -92,11 +91,14 @@ totalScore = (taskUnderstanding*0.20 + practicalExperience*0.25 + safetyAwarenes
 `;
 
 async function setupServer() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const genAI = new GoogleGenAI(apiKey || "");
+
   if (!fs.existsSync(uploadDir)) {
     try {
       fs.mkdirSync(uploadDir);
     } catch (e) {
-      // Ignored for Vercel
+      // Ignored for serverless
     }
   }
 
@@ -114,6 +116,16 @@ async function setupServer() {
 
   app.use(express.json({ limit: "20mb" }));
   app.use(express.urlencoded({ limit: "20mb", extended: true }));
+
+  // Diagnostic Endpoint
+  app.get("/api/health", (req, res) => {
+    res.json({
+      status: "ok",
+      apiKeySet: !!process.env.GEMINI_API_KEY,
+      nodeVersion: process.version,
+      env: process.env.NODE_ENV
+    });
+  });
 
   app.post("/api/upload", upload.single("file"), (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
@@ -133,7 +145,16 @@ async function setupServer() {
   app.post("/api/chat", async (req, res) => {
     try {
       const { messages, currentInput, imageData, selectedModel, isSearchOn } = req.body;
+      
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(500).json({ error: "Vercel 환경 변수에 GEMINI_API_KEY를 설정해 주세요." });
+      }
+
       const modelId = selectedModel || "gemini-flash-latest";
+      const model = genAI.getGenerativeModel({
+        model: modelId,
+        systemInstruction: "당신은 스마트 농업 비서 'FarmNet'입니다. 농민들에게 작물 재배, 병해충 진단, 농산물 시세, 정부 지원 사업 등에 대해 친절하고 전문적으로 답변해 주세요. 한국어로 답변하세요.",
+      });
 
       const parts: any[] = [];
       if (currentInput) parts.push({ text: currentInput });
@@ -150,17 +171,13 @@ async function setupServer() {
           parts: [{ text: m.text || " " }],
         }));
 
-      const response = await genAI.models.generateContent({
-        model: modelId,
+      const result = await model.generateContent({
         contents: [...chatHistory, { role: "user", parts }],
-        config: {
-          systemInstruction: "당신은 스마트 농업 비서 'FarmNet'입니다. 농민들에게 작물 재배, 병해충 진단, 농산물 시세, 정부 지원 사업 등에 대해 친절하고 전문적으로 답변해 주세요. 한국어로 답변하세요.",
-          temperature: 0.7,
-        },
         tools: isSearchOn ? [{ googleSearch: {} }] : undefined,
       } as any);
 
-      res.json({ text: response.text || "답변을 생성할 수 없습니다." });
+      const response = await result.response;
+      res.json({ text: response.text() || "답변을 생성할 수 없습니다." });
     } catch (error: any) {
       console.error("AI Chat Error Detail:", error);
       res.status(500).json({ error: error.message || "AI 응답 생성에 실패했습니다." });
@@ -170,24 +187,24 @@ async function setupServer() {
   app.post("/api/interview", async (req, res) => {
     try {
       const { history, userMessage } = req.body;
+      if (!process.env.GEMINI_API_KEY) throw new Error("API Key missing");
+
+      const model = genAI.getGenerativeModel({
+        model: "gemini-flash-latest",
+        systemInstruction: SOWI_SYSTEM_INSTRUCTION,
+      });
+
       const geminiHistory = ((history as any[]) || []).map((m: any) => ({
         role: m.role === "sowi" ? "model" : "user",
         parts: [{ text: m.text }],
       }));
 
-      const response = await genAI.models.generateContent({
-        model: "gemini-flash-latest",
-        contents: [
-          ...geminiHistory,
-          { role: "user", parts: [{ text: userMessage }] },
-        ],
-        config: {
-          systemInstruction: SOWI_SYSTEM_INSTRUCTION,
-          temperature: 0.4,
-        },
-      } as any);
+      const result = await model.generateContent({
+        contents: [...geminiHistory, { role: "user", parts: [{ text: userMessage }] }],
+      });
 
-      res.json({ text: response.text || "" });
+      const response = await result.response;
+      res.json({ text: response.text() || "" });
     } catch (error: any) {
       res.status(500).json({ error: error.message || "인터뷰 응답 생성 실패" });
     }
@@ -196,11 +213,14 @@ async function setupServer() {
   app.post("/api/generate-title", async (req, res) => {
     try {
       const { input } = req.body;
-      const response = await genAI.models.generateContent({
-        model: "gemini-flash-latest",
-        contents: `다음 질문에 대해 10자 이내의 아주 짧고 명확한 상담 제목을 하나만 생성해 주세요. 다른 설명 없이 제목만 출력하세요: "${input}"`,
-      });
-      res.json({ title: response.text?.trim() || input.slice(0, 20) });
+      if (!process.env.GEMINI_API_KEY) throw new Error("API Key missing");
+
+      const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+      const result = await model.generateContent(
+        `다음 질문에 대해 10자 이내의 아주 짧고 명확한 상담 제목을 하나만 생성해 주세요. 다른 설명 없이 제목만 출력하세요: "${input}"`
+      );
+      const response = await result.response;
+      res.json({ title: response.text().trim() || input.slice(0, 20) });
     } catch (error) {
       res.json({ title: req.body.input?.slice(0, 20) || "새 상담" });
     }
@@ -211,16 +231,12 @@ async function setupServer() {
 
 export { app, setupServer };
 
-if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
+// Local development
+if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
   const PORT = 3000;
   setupServer().then(async (serverApp) => {
-    if (process.env.NODE_ENV !== "production") {
-      const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
-      serverApp.use(vite.middlewares);
-    } else {
-      serverApp.use(express.static("dist"));
-      serverApp.get("*", (req, res) => { res.sendFile(path.resolve("dist/index.html")); });
-    }
+    const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
+    serverApp.use(vite.middlewares);
     serverApp.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
